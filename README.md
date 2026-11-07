@@ -1,24 +1,52 @@
+# 🛡️ AI-Assisted Vulnerability Report Generator (Nmap + Local LLM)
 
+## 📌 Overview
+A homelab tool that scans a subnet with Nmap and asks a locally hosted LLM (via Ollama) to turn the results into a structured Markdown security report with risk levels and hardening suggestions. All analysis runs locally, so network details never leave your environment.
 
-# 🛡️ Autonomous Vulnerability Scanner (Local AI-Powered)
-
-## 📌 Project Overview
-This project is an automated, zero-trust network vulnerability scanner designed for enterprise-grade homelab environments. It performs weekly network sweeps and utilizes strictly local Large Language Models (LLMs) to analyze vulnerabilities and generate actionable security reports.
+> This is a learning and homelab project. The report is an AI-generated summary of Nmap output, not a validated vulnerability assessment. Review the findings manually.
 
 ## 🏗️ Architecture & Technologies
-* **Infrastructure:** Proxmox VE, K3s / Debian
-* **Network Sweeping:** Nmap
-* **AI Analysis:** Ollama (Hermes 3 / Qwen 2.5 Coder) - *100% Local Inference*
-* **Automation:** Cron
-* **Language:** Python
-
-## 🔒 Security Posture & Vision
-In alignment with **ISO 27001** standards and **Zero-Trust** architecture:
-* **No Cloud Data Leakage:** Unlike tools that send network topology data to OpenAI or external APIs, this pipeline processes all Nmap outputs through local AI models. Sensitive internal IP structures never leave the local network.
-* **Continuous Monitoring:** Simulates an automated Blue Team workflow by periodically scanning assets and highlighting outdated services (e.g., legacy SSH/SMB protocols).
+- **Host:** Debian VM on Proxmox VE
+- **Network discovery:** Nmap (`-sV --top-ports 100`)
+- **AI analysis:** Ollama with a local model (default `hermes3:8b`)
+- **Language:** Python (`python-nmap`, `requests`)
+- **Scheduling (optional):** cron
 
 ## 🚀 How It Works
-1. **Discovery:** `nmap` scans the target subnet for active hosts and open ports/services.
-2. **Data Parsing:** Results are structured into a JSON payload.
-3. **AI Evaluation:** The local Ollama API evaluates the payload using a custom cybersecurity-focused system prompt.
-4. **Reporting:** A structured Markdown report is generated, highlighting risk levels and mitigation strategies (e.g., enforcing Public Key authentication over passwords).
+1. **Discovery:** Nmap scans the target subnet for active hosts, open ports and service versions.
+2. **Parsing:** The results are structured into a JSON payload.
+3. **AI evaluation:** The payload and `system_prompt.txt` are sent to the local Ollama API.
+4. **Reporting:** A Markdown report with risk levels and mitigation suggestions is saved as `security_report_<timestamp>.md`.
+
+## ⚙️ Setup
+Requires Python 3, Nmap and a running Ollama instance.
+
+```bash
+pip install -r requirements.txt
+ollama pull hermes3:8b
+```
+
+## ▶️ Usage
+```bash
+python ai_scanner.py --subnet 192.168.1.0/24 --model hermes3:8b
+```
+
+Options: `--subnet`, `--ollama` (default `http://localhost:11434`), `--model`.
+
+Optional weekly run with cron (Sundays at 03:00):
+
+```
+0 3 * * 0 cd /opt/ai-scanner && /usr/bin/python3 ai_scanner.py --subnet 192.168.1.0/24
+```
+
+## 🔒 Privacy
+Nmap output is processed only by a local model, so internal IP ranges and service details are not sent to external AI APIs.
+
+## ⚠️ Limitations
+- Findings are based on service banners from `nmap -sV`. Versions can be spoofed, and distributions such as Debian and Ubuntu often patch packages without changing the version number.
+- The LLM can produce false positives or invented CVE references. Verify findings before acting on them.
+- This is not a replacement for dedicated scanners such as OpenVAS or Nessus.
+- Banner text is untrusted input and could try to influence the model's output.
+
+## ⚖️ Responsible Use
+Only scan networks you own or have written permission to scan.
